@@ -283,7 +283,7 @@ func translateIngress(ns string, name string, targetSelector metav1.LabelSelecto
 			if fromRule.IPBlock != nil {
 				if len(fromRule.IPBlock.CIDR) > 0 {
 					ipCidrs[i] = append(ipCidrs[i], fromRule.IPBlock.CIDR)
-					cidrIpsetName := name + "-cidr" + strconv.Itoa(i) + "in"
+					cidrIpsetName := name + "-in-ns-" + ns + "-" + strconv.Itoa(i) + "in"
 					if len(fromRule.IPBlock.Except) > 0 {
 						for _, except := range fromRule.IPBlock.Except {
 							ipCidrs[i] = append(ipCidrs[i], except + " " + util.IpsetNomatch)
@@ -918,7 +918,7 @@ func translateEgress(ns string, name string, targetSelector metav1.LabelSelector
 			if toRule.IPBlock != nil {
 				if len(toRule.IPBlock.CIDR) > 0 {
 					ipCidrs[i] = append(ipCidrs[i], toRule.IPBlock.CIDR)
-					cidrIpsetName := name + "-cidr" + strconv.Itoa(i) + "out"
+					cidrIpsetName := name + "-in-ns-" + ns + "-" + strconv.Itoa(i) + "out"
 					if len(toRule.IPBlock.Except) > 0 {
 						for _, except := range toRule.IPBlock.Except {
 							ipCidrs[i] = append(ipCidrs[i], except+util.IpsetNomatch)
@@ -1512,21 +1512,19 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []s
 		resultSets = append(resultSets, ingressSets...)
 		resultNamedPorts = append(resultNamedPorts, ingressNamedPorts...)
 		resultLists = append(resultLists, ingressLists...)
-		resultIngressIPCidrs = ingressIPCidrs
 		entries = append(entries, ingressEntries...)
 
 		egressSets, egressNamedPorts, egressLists, egressIPCidrs, egressEntries := translateEgress(npNs, name, npObj.Spec.PodSelector, npObj.Spec.Egress)
 		resultSets = append(resultSets, egressSets...)
 		resultNamedPorts = append(resultNamedPorts, egressNamedPorts...)
 		resultLists = append(resultLists, egressLists...)
-		resultEgressIPCidrs = egressIPCidrs
 		entries = append(entries, egressEntries...)
 
 		hasIngress = len(ingressSets) > 0
 		hasEgress = len(egressSets) > 0
 		entries = append(entries, getDefaultDropEntries(npNs, npObj.Spec.PodSelector, hasIngress, hasEgress)...)
 
-		return util.UniqueStrSlice(resultSets), util.UniqueStrSlice(resultNamedPorts), util.UniqueStrSlice(resultLists), resultIngressIPCidrs, resultEgressIPCidrs, entries
+		return util.UniqueStrSlice(resultSets), util.UniqueStrSlice(resultNamedPorts), util.UniqueStrSlice(resultLists), ingressIPCidrs, egressIPCidrs, entries
 	}
 
 	for _, ptype := range npObj.Spec.PolicyTypes {

@@ -118,8 +118,8 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	if err = npMgr.InitAllNsList(); err != nil {
 		log.Printf("Error initializing all-namespace ipset list.")
 	}
-	createCidrsRule("in", npObj.ObjectMeta.Name, ingressIPCidrs, ipsMgr)
-	createCidrsRule("out", npObj.ObjectMeta.Name, egressIPCidrs, ipsMgr)
+	createCidrsRule("in", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, ingressIPCidrs, ipsMgr)
+	createCidrsRule("out", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, egressIPCidrs, ipsMgr)
 	iptMgr := allNs.iptMgr
 	for _, iptEntry := range iptEntries {
 		if err = iptMgr.Add(iptEntry); err != nil {
@@ -169,8 +169,8 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		}
 	}
 
-	removeCidrsRule("in", npObj.ObjectMeta.Name, ingressIPCidrs, allNs.ipsMgr)
-	removeCidrsRule("out", npObj.ObjectMeta.Name, egressIPCidrs, allNs.ipsMgr)
+	removeCidrsRule("in", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, ingressIPCidrs, allNs.ipsMgr)
+	removeCidrsRule("out", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, egressIPCidrs, allNs.ipsMgr)
 
 	delete(ns.rawNpMap, npObj.ObjectMeta.Name)
 
@@ -199,13 +199,13 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 	return nil
 }
 
-func createCidrsRule(ingressOrEgress string, policyName string, ipsetEntries [][]string, ipsMgr *ipsm.IpsetManager) {
+func createCidrsRule(ingressOrEgress, policyName, ns string, ipsetEntries [][]string, ipsMgr *ipsm.IpsetManager) {
 	spec := append([]string{util.IpsetNetHashFlag, util.IpsetMaxelemName, util.IpsetMaxelemNum})
 	for i, ipCidrSet := range ipsetEntries {
 		if ipCidrSet == nil || len(ipCidrSet) == 0 {
 			continue
 		}
-		setName := policyName + "-cidr" + strconv.Itoa(i) + ingressOrEgress
+		setName := policyName + "-in-ns-" + ns + "-" + strconv.Itoa(i) + ingressOrEgress
 		log.Printf("Creating set: %v, hashedSet: %v", setName, util.GetHashedName(setName))
 		if err := ipsMgr.CreateSet(setName, spec); err != nil {
 			log.Printf("Error creating ipset %s", ipCidrSet)
@@ -218,12 +218,12 @@ func createCidrsRule(ingressOrEgress string, policyName string, ipsetEntries [][
 	}
 }
 
-func removeCidrsRule(ingressOrEgress string, policyName string, ipsetEntries [][]string, ipsMgr *ipsm.IpsetManager) {
+func removeCidrsRule(ingressOrEgress, policyName, ns string, ipsetEntries [][]string, ipsMgr *ipsm.IpsetManager) {
 	for i, ipCidrSet := range ipsetEntries {
 		if ipCidrSet == nil || len(ipCidrSet) == 0 {
 			continue
 		}
-		setName := policyName + "-cidr" + strconv.Itoa(i) + ingressOrEgress
+		setName := policyName + "-in-ns-" + ns + "-" + strconv.Itoa(i) + ingressOrEgress
 		log.Printf("Delete set: %v, hashedSet: %v", setName, util.GetHashedName(setName))
 		if err := ipsMgr.DeleteSet(setName); err != nil {
 			log.Printf("Error deleting ipset %s", ipCidrSet)
