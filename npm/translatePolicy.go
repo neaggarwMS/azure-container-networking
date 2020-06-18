@@ -151,7 +151,7 @@ func craftPartialIptablesCommentFromSelector(ns string, selector *metav1.LabelSe
 	return comment[:len(comment)-len("-AND-")] + postfix
 }
 
-func translateIngress(ns string, name string, targetSelector metav1.LabelSelector, rules []networkingv1.NetworkPolicyIngressRule) ([]string, []string, []string, [][]string, []*iptm.IptEntry) {
+func translateIngress(ns string, policyName string, targetSelector metav1.LabelSelector, rules []networkingv1.NetworkPolicyIngressRule) ([]string, []string, []string, [][]string, []*iptm.IptEntry) {
 	var (
 		sets                                  []string // ipsets with type: net:hash
 		namedPorts                            []string // ipsets with type: hash:ip,port
@@ -283,10 +283,11 @@ func translateIngress(ns string, name string, targetSelector metav1.LabelSelecto
 			if fromRule.IPBlock != nil {
 				if len(fromRule.IPBlock.CIDR) > 0 {
 					ipCidrs[i] = append(ipCidrs[i], fromRule.IPBlock.CIDR)
-					cidrIpsetName := name + "-in-ns-" + ns + "-" + strconv.Itoa(i) + "in"
+					cidrIpsetName := policyName + "-in-ns-" + ns + "-" + strconv.Itoa(i) + "in"
 					if len(fromRule.IPBlock.Except) > 0 {
 						for _, except := range fromRule.IPBlock.Except {
-							ipCidrs[i] = append(ipCidrs[i], except + " " + util.IpsetNomatch)
+							// TODO move IP cidrs rule to allow based only
+							ipCidrs[i] = append(ipCidrs[i], except + util.IpsetNomatch)
 						}
 						addedIngressFromEntry = true
 					}
@@ -790,7 +791,7 @@ func translateIngress(ns string, name string, targetSelector metav1.LabelSelecto
 	return util.DropEmptyFields(sets), util.DropEmptyFields(namedPorts), util.DropEmptyFields(lists), ipCidrs, entries
 }
 
-func translateEgress(ns string, name string, targetSelector metav1.LabelSelector, rules []networkingv1.NetworkPolicyEgressRule) ([]string, []string, []string, [][]string, []*iptm.IptEntry) {
+func translateEgress(ns string, policyName string, targetSelector metav1.LabelSelector, rules []networkingv1.NetworkPolicyEgressRule) ([]string, []string, []string, [][]string, []*iptm.IptEntry) {
 	var (
 		sets                               []string // ipsets with type: net:hash
 		namedPorts                         []string // ipsets with type: hash:ip,port
@@ -918,9 +919,10 @@ func translateEgress(ns string, name string, targetSelector metav1.LabelSelector
 			if toRule.IPBlock != nil {
 				if len(toRule.IPBlock.CIDR) > 0 {
 					ipCidrs[i] = append(ipCidrs[i], toRule.IPBlock.CIDR)
-					cidrIpsetName := name + "-in-ns-" + ns + "-" + strconv.Itoa(i) + "out"
+					cidrIpsetName := policyName + "-in-ns-" + ns + "-" + strconv.Itoa(i) + "out"
 					if len(toRule.IPBlock.Except) > 0 {
 						for _, except := range toRule.IPBlock.Except {
+							// TODO move IP cidrs rule to allow based only
 							ipCidrs[i] = append(ipCidrs[i], except+util.IpsetNomatch)
 						}
 						addedEgressToEntry = true
@@ -944,6 +946,9 @@ func translateEgress(ns string, name string, targetSelector metav1.LabelSelector
 									util.IptablesMatchSetFlag,
 									util.GetHashedName(cidrIpsetName),
 									util.IptablesDstFlag,
+								)
+								entry.Specs = append(
+									entry.Specs,
 									util.IptablesModuleFlag,
 									util.IptablesSetModuleFlag,
 									util.IptablesMatchSetFlag,
@@ -975,6 +980,9 @@ func translateEgress(ns string, name string, targetSelector metav1.LabelSelector
 									util.IptablesMatchSetFlag,
 									util.GetHashedName(cidrIpsetName),
 									util.IptablesDstFlag,
+								)
+								entry.Specs = append(	
+									entry.Specs,
 									util.IptablesJumpFlag,
 									util.IptablesAccept,
 									util.IptablesModuleFlag,
@@ -1505,16 +1513,16 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []s
 	}()
 
 	npNs := npObj.ObjectMeta.Namespace
-	name := npObj.ObjectMeta.Name
+	policyName := npObj.ObjectMeta.Name
 
 	if len(npObj.Spec.PolicyTypes) == 0 {
-		ingressSets, ingressNamedPorts, ingressLists, ingressIPCidrs, ingressEntries := translateIngress(npNs, name, npObj.Spec.PodSelector, npObj.Spec.Ingress)
+		ingressSets, ingressNamedPorts, ingressLists, ingressIPCidrs, ingressEntries := translateIngress(npNs, policyName, npObj.Spec.PodSelector, npObj.Spec.Ingress)
 		resultSets = append(resultSets, ingressSets...)
 		resultNamedPorts = append(resultNamedPorts, ingressNamedPorts...)
 		resultLists = append(resultLists, ingressLists...)
 		entries = append(entries, ingressEntries...)
 
-		egressSets, egressNamedPorts, egressLists, egressIPCidrs, egressEntries := translateEgress(npNs, name, npObj.Spec.PodSelector, npObj.Spec.Egress)
+		egressSets, egressNamedPorts, egressLists, egressIPCidrs, egressEntries := translateEgress(npNs, policyName, npObj.Spec.PodSelector, npObj.Spec.Egress)
 		resultSets = append(resultSets, egressSets...)
 		resultNamedPorts = append(resultNamedPorts, egressNamedPorts...)
 		resultLists = append(resultLists, egressLists...)
@@ -1529,7 +1537,7 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []s
 
 	for _, ptype := range npObj.Spec.PolicyTypes {
 		if ptype == networkingv1.PolicyTypeIngress {
-			ingressSets, ingressNamedPorts, ingressLists, ingressIPCidrs, ingressEntries := translateIngress(npNs, name, npObj.Spec.PodSelector, npObj.Spec.Ingress)
+			ingressSets, ingressNamedPorts, ingressLists, ingressIPCidrs, ingressEntries := translateIngress(npNs, policyName, npObj.Spec.PodSelector, npObj.Spec.Ingress)
 			resultSets = append(resultSets, ingressSets...)
 			resultNamedPorts = append(resultNamedPorts, ingressNamedPorts...)
 			resultLists = append(resultLists, ingressLists...)
@@ -1547,7 +1555,7 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []s
 		}
 
 		if ptype == networkingv1.PolicyTypeEgress {
-			egressSets, egressNamedPorts, egressLists, egressIPCidrs, egressEntries := translateEgress(npNs, name, npObj.Spec.PodSelector, npObj.Spec.Egress)
+			egressSets, egressNamedPorts, egressLists, egressIPCidrs, egressEntries := translateEgress(npNs, policyName, npObj.Spec.PodSelector, npObj.Spec.Egress)
 			resultSets = append(resultSets, egressSets...)
 			resultNamedPorts = append(resultNamedPorts, egressNamedPorts...)
 			resultLists = append(resultLists, egressLists...)

@@ -2941,11 +2941,11 @@ func TestComplexPolicy(t *testing.T) {
 	}
 
 	expectedIngressIPCidrs := [][]string {
-		{"", "", "", "172.17.0.0/16", "172.17.1.0/24 nomatch"},
+		{"", "", "", "172.17.0.0/16", "172.17.1.0/24nomatch"},
 	}
 
 	expectedEgressIPCidrs := [][]string {
-		{"", "10.0.0.0/24"},
+		{"", "10.0.0.0/24", "10.0.0.1/32nomatch"},
 	}
 
 	if !reflect.DeepEqual(ingressIPCidrs, expectedIngressIPCidrs) {
@@ -2960,6 +2960,8 @@ func TestComplexPolicy(t *testing.T) {
 		t.Errorf("expected egress IP Cidrs: %v", expectedEgressIPCidrs)
 	}
 
+	cidrIngressIpsetName := "k8s-example-policy" + "-in-ns-" + "default-" + "0" + "in"
+	cidrEgressIpsetName := "k8s-example-policy" + "-in-ns-" + "default-" + "0" + "out"
 	expectedIptEntries := []*iptm.IptEntry{}
 	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
@@ -2978,7 +2980,7 @@ func TestComplexPolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName("k8s-example-policy" + "cidr" + "0" + "in"),
+				util.GetHashedName(cidrIngressIpsetName),
 				util.IptablesSrcFlag,
 				util.IptablesProtFlag,
 				"TCP",
@@ -2986,6 +2988,10 @@ func TestComplexPolicy(t *testing.T) {
 				"6379",
 				util.IptablesJumpFlag,
 				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-" + cidrIngressIpsetName + "-:-TCP-PORT-6379-TO-role:db-IN-ns-default",
 			},
 		},
 		&iptm.IptEntry{
@@ -3117,20 +3123,40 @@ func TestComplexPolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName("k8s-example-policy" + "cidr" + "0" + "out"),
+				util.GetHashedName(cidrEgressIpsetName),
 				util.IptablesDstFlag,
-				// util.IptablesDFlag,
-				// "10.0.0.0/24",
 				util.IptablesJumpFlag,
 				util.IptablesAccept,
-				// util.IptablesModuleFlag,
-				// util.IptablesCommentModuleFlag,
-				// util.IptablesCommentFlag,
-				// "ALLOW-10.0.0.0/24-:-TCP-PORT-5978-FROM-role:db-IN-ns-default",
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-" + cidrEgressIpsetName + "-:-TCP-PORT-5978-FROM-role:db-IN-ns-default",
 			},
 		},
 		&iptm.IptEntry{
 			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("ns-default"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("role:db"),
+				util.IptablesSrcFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureEgressToChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-FROM-role:db-IN-ns-default-TO-JUMP-TO-" + util.IptablesAzureEgressToChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain:       util.IptablesAzureEgressToChain,
 			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,

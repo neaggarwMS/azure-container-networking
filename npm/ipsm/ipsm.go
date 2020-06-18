@@ -81,7 +81,7 @@ func (ipsMgr *IpsetManager) CreateList(listName string) error {
 		name:          listName,
 		operationFlag: util.IpsetCreationFlag,
 		set:           util.GetHashedName(listName),
-		spec:          append([]string{util.IpsetSetListFlag}),
+		spec:          []string{util.IpsetSetListFlag},
 	}
 	log.Printf("Creating List: %+v", entry)
 	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
@@ -132,7 +132,7 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 	entry := &ipsEntry{
 		operationFlag: util.IpsetAppendFlag,
 		set:           util.GetHashedName(listName),
-		spec:          append([]string{util.GetHashedName(setName)}),
+		spec:          []string{util.GetHashedName(setName)},
 	}
 
 	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
@@ -162,7 +162,7 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 	entry := &ipsEntry{
 		operationFlag: util.IpsetDeletionFlag,
 		set:           hashedListName,
-		spec:          append([]string{hashedSetName}),
+		spec:          []string{hashedSetName},
 	}
 
 	if _, err := ipsMgr.Run(entry); err != nil {
@@ -239,11 +239,18 @@ func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec string) error {
 	if err := ipsMgr.CreateSet(setName, append([]string{util.IpsetNetHashFlag})); err != nil {
 		return err
 	}
+	var resultSpec []string
+	if strings.Contains(ip, util.IpsetNomatch) {
+		ip = strings.Trim(ip, util.IpsetNomatch)
+		resultSpec = append([]string{ip, util.IpsetNomatch})
+	} else {
+		resultSpec = append([]string{ip})
+	}
 
 	entry := &ipsEntry{
 		operationFlag: util.IpsetAppendFlag,
 		set:           util.GetHashedName(setName),
-		spec:          append([]string{ip}),
+		spec:          resultSpec,
 	}
 
 	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {

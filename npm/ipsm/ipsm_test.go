@@ -173,6 +173,10 @@ func TestAddToSet(t *testing.T) {
 	if err := ipsMgr.AddToSet("test-set", "1.2.3.4", util.IpsetNetHashFlag); err != nil {
 		t.Errorf("TestAddToSet failed @ ipsMgr.AddToSet")
 	}
+
+	if err := ipsMgr.AddToSet("test-set", "1.2.3.4/nomatch", util.IpsetNetHashFlag); err != nil {
+		t.Errorf("TestAddToSet with nomatch failed @ ipsMgr.AddToSet")
+	}
 }
 
 func TestDeleteFromSet(t *testing.T) {
