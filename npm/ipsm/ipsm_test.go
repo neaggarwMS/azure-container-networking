@@ -215,7 +215,7 @@ func TestAddToSetWithCachePodInfo(t *testing.T) {
 		t.Errorf("setname: %s, hashedname: %s is added with wrong podUid: %s, expected: %s", setname, util.GetHashedName(setname), cachedPodUid, pod2)
 	}
 
-	// Delete set
+	// Delete from set, it will delete the set if this is the last member
 	ipsMgr.DeleteFromSet(setname, ip, pod2)
 }
 
@@ -246,6 +246,65 @@ func TestDeleteFromSet(t *testing.T) {
 	// After deleting the only entry, "1.2.3.4" from "test-set", "test-set" ipset won't exist
 	if _, exists := ipsMgr.setMap["test-set"]; exists {
 		t.Errorf("TestDeleteFromSet failed @ ipsMgr.DeleteFromSet")
+	}
+}
+
+func TestDeleteFromSetWithPodCache(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestDeleteFromSetWithPodCache failed @ ipsMgr.Restore")
+		}
+	}()
+
+	var setname = "test-deleteset-withcache"
+	var ip = "10.0.2.8"
+	var pod1 = "pod1"
+	if err := ipsMgr.AddToSet(setname, ip, util.IpsetNetHashFlag, pod1); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache failed for pod1 @ ipsMgr.AddToSet")
+	}
+
+	if len(ipsMgr.setMap[setname].elements) != 1 {
+		t.Errorf("TestDeleteFromSetWithPodCache failed @ ipsMgr.AddToSet")
+	}
+
+	if err := ipsMgr.DeleteFromSet(setname, ip, pod1); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache for pod1 failed @ ipsMgr.DeleteFromSet")
+	}
+
+	// now add the set again and then replace it with pod2
+	var pod2 = "pod2"
+	if err := ipsMgr.AddToSet(setname, ip, util.IpsetNetHashFlag, pod1); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache failed for pod1 @ ipsMgr.AddToSet")
+	}
+
+	// Add Pod2 with same ip (This could happen if AddPod2 is served before DeletePod1)
+	if err := ipsMgr.AddToSet(setname, ip, util.IpsetNetHashFlag, pod2); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache failed for pod2 @ ipsMgr.AddToSet")
+	}
+
+	// Process DeletePod1
+	if err := ipsMgr.DeleteFromSet(setname, ip, pod1); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache for pod1 failed @ ipsMgr.DeleteFromSet")
+	}
+
+	// note the set will stil exist with pod ip
+	cachedPodUid := ipsMgr.setMap[setname].elements[ip]
+	if cachedPodUid != pod2 {
+		t.Errorf("setname: %s, hashedname: %s is added with wrong podUid: %s, expected: %s", setname, util.GetHashedName(setname), cachedPodUid, pod2)
+	}
+
+	// Now cleanup and delete pod2
+	if err := ipsMgr.DeleteFromSet(setname, ip, pod2); err != nil {
+		t.Errorf("TestDeleteFromSetWithPodCache for pod2 failed @ ipsMgr.DeleteFromSet")
+	}
+
+	if _, exists := ipsMgr.setMap[setname]; exists {
+		t.Errorf("TestDeleteFromSetWithPodCache failed @ ipsMgr.DeleteFromSet")
 	}
 }
 
