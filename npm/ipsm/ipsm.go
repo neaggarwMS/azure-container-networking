@@ -28,7 +28,7 @@ type IpsetManager struct {
 // Ipset represents one ipset entry.
 type Ipset struct {
 	name       string
-	elements   map[string]string // key = ip, value: context associated to the ip like podOwnername
+	elements   map[string]string // key = ip, value: context associated to the ip like podUid
 	referCount int
 }
 
@@ -232,7 +232,7 @@ func (ipsMgr *IpsetManager) DeleteSet(setName string) error {
 func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) error {
 	if ipsMgr.Exists(setName, ip, spec) {
 
-		// make sure we have updated hte podUid in case it gets changed
+		// make sure we have updated the podUid in case it gets changed
 		cachedPodUid := ipsMgr.setMap[setName].elements[ip]
 		if cachedPodUid != podUid {
 			log.Logf("AddToSet: PodOwner has changed for Ip: %s, setName:%s, Old podUid: %s, new PodUid: %s. Replace context with new PodOwner.",
