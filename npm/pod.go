@@ -51,11 +51,7 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 		ipsMgr        = npMgr.nsMap[util.KubeAllNamespacesFlag].ipsMgr
 	)
 
-<<<<<<< HEAD
-	log.Logf("POD CREATING: [%s/%s/%s%+v%s]", podNs, podName, podNodeName, podLabels, podIP)
-=======
-	log.Printf("POD CREATING: [%s%s/%s/%s%+v%s]", podUid, podNs, podName, podNodeName, podLabels, podIP)
->>>>>>> Changes for cahing pod ip
+	log.Logf("POD CREATING: [%s%s/%s/%s%+v%s]", podUid, podNs, podName, podNodeName, podLabels, podIP)
 
 	// Add pod namespace if it doesn't exist
 	if _, exists := npMgr.nsMap[podNs]; !exists {
@@ -66,36 +62,21 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 	}
 
 	// Add the pod to its namespace's ipset.
-<<<<<<< HEAD
 	log.Logf("Adding pod %s to ipset %s", podIP, podNs)
-	if err = ipsMgr.AddToSet(podNs, podIP, util.IpsetNetHashFlag); err != nil {
-=======
-	log.Printf("Adding pod %s to ipset %s", podIP, podNs)
 	if err = ipsMgr.AddToSet(podNs, podIP, util.IpsetNetHashFlag, podUid); err != nil {
->>>>>>> Changes for cahing pod ip
 		log.Errorf("Error: failed to add pod to namespace ipset.")
 	}
 
 	// Add the pod to its label's ipset.
 	for podLabelKey, podLabelVal := range podLabels {
-<<<<<<< HEAD
 		log.Logf("Adding pod %s to ipset %s", podIP, podLabelKey)
-		if err = ipsMgr.AddToSet(podLabelKey, podIP, util.IpsetNetHashFlag); err != nil {
-=======
-		log.Printf("Adding pod %s to ipset %s", podIP, podLabelKey)
 		if err = ipsMgr.AddToSet(podLabelKey, podIP, util.IpsetNetHashFlag, podUid); err != nil {
->>>>>>> Changes for cahing pod ip
 			log.Errorf("Error: failed to add pod to label ipset.")
 		}
 
 		label := podLabelKey + ":" + podLabelVal
-<<<<<<< HEAD
 		log.Logf("Adding pod %s to ipset %s", podIP, label)
-		if err = ipsMgr.AddToSet(label, podIP, util.IpsetNetHashFlag); err != nil {
-=======
-		log.Printf("Adding pod %s to ipset %s", podIP, label)
 		if err = ipsMgr.AddToSet(label, podIP, util.IpsetNetHashFlag, podUid); err != nil {
->>>>>>> Changes for cahing pod ip
 			log.Errorf("Error: failed to add pod to label ipset.")
 		}
 	}
@@ -189,9 +170,6 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 		return nil
 	}
 
-<<<<<<< HEAD
-	log.Logf("POD DELETING: [%s/%s/%s%+v%s]", podNs, podName, podNodeName, podLabels, podIP)
-=======
 	// if the podIp exists, it must match the cachedIp
 	if len(podObj.Status.PodIP) > 0 && cachedPodIp != podObj.Status.PodIP {
 		// TODO Add AI telemetry event
@@ -199,8 +177,7 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 			podNs, podName, podUid, cachedPodIp, podObj.Status.PodIP)
 	}
 
-	log.Printf("POD DELETING: [%s/%s%s/%s%+v%s]", podNs, podName, podUid, podNodeName, podLabels, cachedPodIp)
->>>>>>> Changes for cahing pod ip
+	log.Logf("POD DELETING: [%s/%s%s/%s%+v%s]", podNs, podName, podUid, podNodeName, podLabels, cachedPodIp)
 
 	// Delete the pod from its namespace's ipset.
 	if err = ipsMgr.DeleteFromSet(podNs, cachedPodIp, podUid); err != nil {
@@ -209,24 +186,14 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 
 	// Delete the pod from its label's ipset.
 	for podLabelKey, podLabelVal := range podLabels {
-<<<<<<< HEAD
-		log.Logf("Deleting pod %s from ipset %s", podIP, podLabelKey)
-		if err = ipsMgr.DeleteFromSet(podLabelKey, podIP); err != nil {
-=======
-		log.Printf("Deleting pod %s from ipset %s", cachedPodIp, podLabelKey)
+		log.Logf("Deleting pod %s from ipset %s", cachedPodIp, podLabelKey)
 		if err = ipsMgr.DeleteFromSet(podLabelKey, cachedPodIp, podUid); err != nil {
->>>>>>> Changes for cahing pod ip
 			log.Errorf("Error: failed to delete pod from label ipset.")
 		}
 
 		label := podLabelKey + ":" + podLabelVal
-<<<<<<< HEAD
-		log.Logf("Deleting pod %s from ipset %s", podIP, label)
-		if err = ipsMgr.DeleteFromSet(label, podIP); err != nil {
-=======
-		log.Printf("Deleting pod %s from ipset %s", cachedPodIp, label)
+		log.Logf("Deleting pod %s from ipset %s", cachedPodIp, label)
 		if err = ipsMgr.DeleteFromSet(label, cachedPodIp, podUid); err != nil {
->>>>>>> Changes for cahing pod ip
 			log.Errorf("Error: failed to delete pod from label ipset.")
 		}
 	}
