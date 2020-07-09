@@ -280,13 +280,15 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
 		return nil
 	}
 
-	// in case the IP belongs to a new Pod, then ignore this Delete call as this might be stale
-	cachedPodUid := ipSet.elements[ip]
-	if cachedPodUid != podUid {
-		log.Logf("DeleteFromSet: PodOwner has changed for Ip: %s, setName:%s, Old podUid: %s, new PodUid: %s. Ignore the delete as this is stale update",
-			ip, setName, cachedPodUid, podUid)
+	if _, exists := ipsMgr.setMap[setName].elements[ip]; exists {
+		// in case the IP belongs to a new Pod, then ignore this Delete call as this might be stale
+		cachedPodUid := ipSet.elements[ip]
+		if cachedPodUid != podUid {
+			log.Logf("DeleteFromSet: PodOwner has changed for Ip: %s, setName:%s, Old podUid: %s, new PodUid: %s. Ignore the delete as this is stale update",
+				ip, setName, cachedPodUid, podUid)
 
-		return nil
+			return nil
+		}
 	}
 
 	// TODO optimize to not run this command in case cache has already been updated.
