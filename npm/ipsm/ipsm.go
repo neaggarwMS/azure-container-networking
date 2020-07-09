@@ -308,9 +308,7 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
 	}
 
 	// Now cleanup the cache
-	if _, exists := ipsMgr.setMap[setName].elements[ip]; exists {
-		delete(ipsMgr.setMap[setName].elements, ip)
-	}
+	delete(ipsMgr.setMap[setName].elements, ip)
 
 	if len(ipsMgr.setMap[setName].elements) == 0 {
 		ipsMgr.DeleteSet(setName)
