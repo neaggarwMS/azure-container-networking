@@ -23,7 +23,7 @@ func (client *Client) CreateOrUpdateNC(ncRequest cns.CreateNetworkContainerReque
 	return nil
 }
 
-// InitCNSState initializes cns state
+// ReconcileNCState initializes cns state
 func (client *Client) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]cns.KubernetesPodInfo) error {
 	returnCode := client.RestService.ReconcileNCState(ncRequest, podInfoByIP)
 

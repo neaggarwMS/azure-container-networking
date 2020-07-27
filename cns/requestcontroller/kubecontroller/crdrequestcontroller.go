@@ -232,7 +232,7 @@ func (crdRC *crdRequestController) initCNS() error {
 	}
 
 	// Call cnsclient init cns passing those two things
-	return crdRC.CNSClient.ReconcileNCState(ncRequest, podInfoByIP)
+	return crdRC.CNSClient.ReconcileNCState(&ncRequest, podInfoByIP)
 
 }
 
