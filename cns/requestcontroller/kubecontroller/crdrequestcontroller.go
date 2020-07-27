@@ -171,9 +171,9 @@ func (crdRC *crdRequestController) initCNS() error {
 	var (
 		pods          *corev1.PodList
 		pod           corev1.Pod
-		podInfo       *cns.KubernetesPodInfo
+		podInfo       cns.KubernetesPodInfo
 		nodeNetConfig *nnc.NodeNetworkConfig
-		podInfoByIP   map[string]*cns.KubernetesPodInfo
+		podInfoByIP   map[string]cns.KubernetesPodInfo
 		cntxt         context.Context
 		ncRequest     cns.CreateNetworkContainerRequest
 		err           error
@@ -218,11 +218,11 @@ func (crdRC *crdRequestController) initCNS() error {
 
 	// Convert pod list to map of pod ip -> kubernetes pod info
 	if len(pods.Items) != 0 {
-		podInfoByIP = make(map[string]*cns.KubernetesPodInfo)
+		podInfoByIP = make(map[string]cns.KubernetesPodInfo)
 		for _, pod = range pods.Items {
 			//Only add pods that aren't on the host network
 			if !pod.Spec.HostNetwork {
-				podInfo = &cns.KubernetesPodInfo{
+				podInfo = cns.KubernetesPodInfo{
 					PodName:      pod.Name,
 					PodNamespace: pod.Namespace,
 				}
@@ -231,7 +231,9 @@ func (crdRC *crdRequestController) initCNS() error {
 		}
 	}
 
-	return crdRC.CNSClient.InitCNSState(&ncRequest, podInfoByIP)
+	// Call cnsclient init cns passing those two things
+	return crdRC.CNSClient.ReconcileNCState(ncRequest, podInfoByIP)
+
 }
 
 // UpdateCRDSpec updates the CRD spec
