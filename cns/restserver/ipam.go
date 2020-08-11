@@ -4,10 +4,10 @@
 package restserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/logger"
@@ -192,7 +192,7 @@ func (service *HTTPRestService) AllocateDesiredIPConfig(podInfo cns.KubernetesPo
 			if ipState.State == cns.Allocated {
 				// This IP has already been allocated, if it is allocated to same pod, then return the same
 				// IPconfiguration
-				if reflect.DeepEqual(orchestratorContext, ipState.OrchestratorContext) == true {
+				if bytes.Equal(orchestratorContext, ipState.OrchestratorContext) == true {
 					found = true
 				} else {
 					var pInfo cns.KubernetesPodInfo
