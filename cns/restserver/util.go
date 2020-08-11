@@ -628,13 +628,13 @@ func (service *HTTPRestService) validateIpConfigRequest(ipConfigRequest cns.GetI
 	}
 
 	if ipConfigRequest.OrchestratorContext == nil {
-		return EmptyOrchastretorContext, fmt.Sprintf("OrchastratorContext is not set in the req: %+v", ipConfigRequest)
+		return EmptyOrchestratorContext, fmt.Sprintf("OrchastratorContext is not set in the req: %+v", ipConfigRequest)
 	}
 
 	// retrieve podinfo  from orchestrator context
 	var podInfo cns.KubernetesPodInfo
 	if err := json.Unmarshal(ipConfigRequest.OrchestratorContext, &podInfo); err != nil {
-		return UnsupportedOrchastretorContext, err.Error()
+		return UnsupportedOrchestratorContext, err.Error()
 	}
 
 	return Success, ""
