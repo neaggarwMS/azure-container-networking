@@ -47,7 +47,6 @@ func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 	for _, secIpAddress := range secondaryIps {
 		secIpConfig := cns.SecondaryIPConfig{
 			IPAddress: secIpAddress,
-			},
 		}
 		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
