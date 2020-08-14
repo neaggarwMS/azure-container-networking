@@ -3,6 +3,8 @@ package kubecontroller
 import (
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/cns"
 	nnc "github.com/Azure/azure-container-networking/nodenetworkconfig/api/v1alpha"
@@ -18,10 +20,10 @@ func CRDStatusToNCRequest(crdStatus nnc.NodeNetworkConfigStatus) (cns.CreateNetw
 		ipAssignment      nnc.IPAssignment
 		err               error
 		ip                net.IP
-		ipNet             *net.IPNet
-		bits              int
-		numNCsSupported   int
-		numNCs            int
+		//ipNet             *net.IPNet
+		size            int
+		numNCsSupported int
+		numNCs          int
 	)
 
 	numNCsSupported = 1
@@ -37,21 +39,22 @@ func CRDStatusToNCRequest(crdStatus nnc.NodeNetworkConfigStatus) (cns.CreateNetw
 		ncRequest.NetworkContainerid = nc.ID
 		ncRequest.NetworkContainerType = cns.Docker
 
-		// Convert "10.0.0.1/32" into "10.0.0.1" and prefix length
-		// Todo, this will be changed soon and only ipaddress will be passed
-		if ip, ipNet, err = net.ParseCIDR(nc.PrimaryIP); err != nil {
-			return ncRequest, err
+		if ip = net.ParseIP(nc.PrimaryIP); ip == nil {
+			return ncRequest, fmt.Errorf("Invalid PrimaryIP %s:", nc.PrimaryIP)
 		}
-		_, bits = ipNet.Mask.Size()
+
+		if _, size, err = GetIPAddressStringAndPrefix(nc.SubnetAddressSpace); err != nil {
+			return ncRequest, fmt.Errorf("Invalid SubnetAddressSpace %s:", nc.SubnetAddressSpace)
+		}
 
 		ipSubnet.IPAddress = ip.String()
-		ipSubnet.PrefixLength = uint8(bits)
+		ipSubnet.PrefixLength = uint8(size)
 		ncRequest.IPConfiguration.IPSubnet = ipSubnet
 		ncRequest.IPConfiguration.GatewayIPAddress = nc.DefaultGateway
 
 		for _, ipAssignment = range nc.IPAssignments {
-			if ip, _, err = net.ParseCIDR(ipAssignment.IP); err != nil {
-				return ncRequest, err
+			if ip = net.ParseIP(ipAssignment.IP); ip == nil {
+				return ncRequest, fmt.Errorf("Invalid SecondaryIP %s:", ipAssignment.IP)
 			}
 
 			secondaryIPConfig = cns.SecondaryIPConfig{
@@ -83,4 +86,23 @@ func CNSToCRDSpec(toBeDeletedSecondaryIPConfigs map[string]cns.SecondaryIPConfig
 	}
 
 	return spec, nil
+}
+
+func GetIPAddressStringAndPrefix(ipSubnetString string) (string, int, error) {
+	splitIPSubnet := strings.Split(ipSubnetString, "/")
+
+	if len(splitIPSubnet) != 2 {
+		err := fmt.Errorf(fmt.Sprintf("Failed to split IpSubnet string: [%s]", ipSubnetString))
+		return "", 0, err
+	}
+
+	ipAddressString := splitIPSubnet[0]
+	prefixInInt, atoiErr := strconv.Atoi(splitIPSubnet[1])
+
+	if atoiErr != nil {
+		err := fmt.Errorf(fmt.Sprintf("Failed to acquire subnet prefix from [%s]", splitIPSubnet[1]))
+		return "", 0, err
+	}
+
+	return ipAddressString, prefixInInt, nil
 }
