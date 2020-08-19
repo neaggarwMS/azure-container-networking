@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
+	"github.com/Azure/azure-container-networking/cns/imdsclient"
 )
 
 var (
@@ -40,7 +41,7 @@ var (
 
 func getTestService() *HTTPRestService {
 	var config common.ServiceConfig
-	httpsvc, _ := NewHTTPRestService(&config)
+	httpsvc, _ := NewHTTPRestService(&config, new(imdsclient.ImdsClient))
 	svc = httpsvc.(*HTTPRestService)
 	setOrchestratorTypeInternal(cns.KubernetesCRD)
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
+	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	acncommon "github.com/Azure/azure-container-networking/common"
 )
@@ -656,7 +657,7 @@ func startService() {
 	var err error
 	// Create the service.
 	config := common.ServiceConfig{}
-	service, err = NewHTTPRestService(&config)
+	service, err = NewHTTPRestService(&config, new(imdsclient.ImdsClient))
 	if err != nil {
 		fmt.Printf("Failed to create CNS object %v\n", err)
 		os.Exit(1)
