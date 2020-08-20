@@ -51,6 +51,7 @@ CNSFILES = \
 	$(wildcard cns/networkcontainers/*.go) \
 	$(wildcard cns/requestcontroller/*.go) \
 	$(wildcard cns/requestcontroller/kubecontroller/*.go) \
+	$(wildcard cns/mock/*.go) \
 	$(COREFILES) \
 	$(CNMFILES)
 

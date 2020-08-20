@@ -111,7 +111,7 @@ func NewHTTPRestService(config *common.ServiceConfig, imdsClientInterface imdscl
 	imdsClient := imdsClientInterface
 	routingTable := &routes.RoutingTable{}
 	nc := &networkcontainers.NetworkContainers{}
-	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
+	dc, err := dockerclient.NewDefaultDockerClient(imdsClientInterface)
 
 	if err != nil {
 		return nil, err
