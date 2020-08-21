@@ -1,7 +1,7 @@
 // Copyright 2017 Microsoft. All rights reserved.
 // MIT License
 
-package mock
+package fakes
 
 import (
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
@@ -17,7 +17,7 @@ var (
 type ImdsClientTest struct {
 }
 
-func NewMockImdsClient() *ImdsClientTest {
+func NewFakeImdsClient() *ImdsClientTest {
 	return &ImdsClientTest{}
 }
 
