@@ -663,7 +663,7 @@ func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus 
 
 	hostInterfaceInfo, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
 	if err != nil {
-		return fmt.Errorf("")
+		return fmt.Errorf("Failed to get the HostInterfaceInfo %s", err)
 	}
 
 	podIpInfo.HostPrimaryIPInfo.PrimaryIP = hostInterfaceInfo.PrimaryIP
