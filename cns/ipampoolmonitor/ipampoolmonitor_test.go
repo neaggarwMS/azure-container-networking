@@ -379,7 +379,7 @@ func TestPoolSizeDecreaseToReallyLow(t *testing.T) {
 		t.Fatalf("Expected pool size to be one batch size smaller after reconcile, expected %v, actual %v", (initialIPConfigCount - batchSize), len(poolmonitor.cachedNNC.Spec.IPsNotInUse))
 	}
 
-	t.Logf("Remove all released ips")
+	t.Logf("Update Request Controller")
 	err = fakerc.Reconcile()
 	if err != nil {
 		t.Error(err)
