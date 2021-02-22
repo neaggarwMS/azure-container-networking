@@ -77,7 +77,7 @@ func (pm *CNSIPAMPoolMonitor) Reconcile() error {
 	// pod count is increasing
 	case freeIPConfigCount < pm.MinimumFreeIps:
 		logger.Printf("[ipam-pool-monitor] Increasing pool size...%s ", msg)
-			return pm.increasePoolSize()
+		return pm.increasePoolSize()
 
 	// pod count is decreasing
 	case freeIPConfigCount > pm.MaximumFreeIps:
