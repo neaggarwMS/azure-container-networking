@@ -728,6 +728,7 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	}
 
 	ctx := context.Background()
+	logger.Printf("Starting IPAM Pool Monitor")
 	go func() {
 		if err := httpRestServiceImplementation.IPAMPoolMonitor.Start(ctx, poolIPAMRefreshRateInMilliseconds); err != nil {
 			logger.Errorf("[Azure CNS] Failed to start pool monitor with err: %v", err)
