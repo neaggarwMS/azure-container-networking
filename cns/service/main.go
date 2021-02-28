@@ -690,14 +690,14 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 		return
 	}
 
+    // initialize the ipam pool monitor
+	httpRestServiceImplementation.IPAMPoolMonitor = ipampoolmonitor.NewCNSIPAMPoolMonitor(httpRestServiceImplementation, requestController)
+
 	err = requestController.InitRequestController()
 	if err != nil {
 		logger.Errorf("[Azure CNS] Failed to initialized cns state :%v", err)
 		return
 	}
-
-    // initialize the ipam pool monitor
-	httpRestServiceImplementation.IPAMPoolMonitor = ipampoolmonitor.NewCNSIPAMPoolMonitor(httpRestServiceImplementation, requestController)
 
 	//Start the RequestController which starts the reconcile loop
 	requestControllerStopChannel := make(chan struct{})
