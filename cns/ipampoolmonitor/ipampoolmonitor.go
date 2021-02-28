@@ -104,23 +104,31 @@ func (pm *CNSIPAMPoolMonitor) increasePoolSize() error {
 	defer pm.mu.Unlock()
 
 	var err error
-	pm.cachedNNC.Spec.RequestedIPCount += pm.scalarUnits.BatchSize
-
-	// pass nil map to CNStoCRDSpec because we don't want to modify the to be deleted ipconfigs
-	pm.cachedNNC.Spec, err = pm.createNNCSpecForCRD(false)
+	var tempNNCSpec nnc.NodeNetworkConfigSpec
+	tempNNCSpec, err = pm.createNNCSpecForCRD(false)
 	if err != nil {
 		return err
 	}
 
-	logger.Printf("[ipam-pool-monitor] Increasing pool size, Current Pool Size: %v, Requested IP Count: %v, Pods with IP's:%v, ToBeDeleted Count: %v", len(pm.cns.GetPodIPConfigState()), pm.cachedNNC.Spec.RequestedIPCount, len(pm.cns.GetAllocatedIPConfigs()), len(pm.cachedNNC.Spec.IPsNotInUse))
-	return pm.rc.UpdateCRDSpec(context.Background(), pm.cachedNNC.Spec)
+	tempNNCSpec.RequestedIPCount += pm.scalarUnits.BatchSize
+
+	logger.Printf("[ipam-pool-monitor] Increasing pool size, Current Pool Size: %v, Updated Requested IP Count: %v, Pods with IP's:%v, ToBeDeleted Count: %v", len(pm.cns.GetPodIPConfigState()), tempNNCSpec.RequestedIPCount, len(pm.cns.GetAllocatedIPConfigs()), len(tempNNCSpec.IPsNotInUse))
+	err = pm.rc.UpdateCRDSpec(context.Background(), pm.cachedNNC.Spec)
+	if err != nil {
+		// caller will retry to update the CRD again
+		return err
+	}
+
+	// save the updated state to cachedSpec
+	pm.cachedNNC.Spec = tempNNCSpec
+
 }
 
 func (pm *CNSIPAMPoolMonitor) decreasePoolSize() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	// TODO: Better handling here for negatives
+	var tempNNCSpec nnc.NodeNetworkConfigSpec	
 	pm.cachedNNC.Spec.RequestedIPCount -= pm.scalarUnits.BatchSize
 
 	// mark n number of IP's as pending
