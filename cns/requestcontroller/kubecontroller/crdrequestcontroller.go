@@ -145,7 +145,7 @@ func NewCrdRequestController(restService *restserver.HTTPRestService, kubeconfig
 
 // InitRequestController will initialize/reconcile the CNS state
 func (crdRC *crdRequestController) InitRequestController() error {
-	logger.Printf("Initializing CNS state")
+	logger.Printf("InitRequestController")
 
 	defer crdRC.lock.Unlock()
 	crdRC.lock.Lock()
