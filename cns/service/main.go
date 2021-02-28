@@ -690,7 +690,7 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 		return
 	}
 
-	err := requestController.InitRequestController()
+	err = requestController.InitRequestController()
 	if err != nil {
 		logger.Errorf("[Azure CNS] Failed to initialized cns state :%v", err)
 		return
