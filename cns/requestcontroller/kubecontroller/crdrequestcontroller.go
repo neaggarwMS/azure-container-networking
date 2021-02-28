@@ -188,7 +188,8 @@ func (crdRC *crdRequestController) StartRequestController(exitChan <-chan struct
 	return nil
 }
 
-func (crdRC *crdRequestController) isStarted() bool {
+// return if RequestController is started
+func (crdRC *crdRequestController) IsStarted() bool {
 	defer crdRC.lock.Unlock()
 	crdRC.lock.Lock()
 	return crdRC.Started
