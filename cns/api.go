@@ -57,7 +57,7 @@ type IPConfigurationStatus struct {
 	OrchestratorContext json.RawMessage
 }
 
-func (i IPConfigurationStatus) ToString() string {
+func (i IPConfigurationStatus) String() string {
 	return fmt.Sprintf("IPConfigurationStatus: Id %s, NcId %s, IpAddress %s, State %s, OrchestratorContext %s",
 		i.ID, i.NCID, i.IPAddress, i.State, string(i.OrchestratorContext))
 }
