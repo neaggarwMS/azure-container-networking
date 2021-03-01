@@ -99,20 +99,17 @@ func (service *HTTPRestService) MarkIPAsPendingRelease(totalIpsToRelease int) (m
 	service.Lock()
 	defer service.Unlock()
 
-	var count int
 	for uuid, ipcConfig := range service.PodIPConfigState {
         if ipcConfig.State == cns.PendingProgramming {
-            if err := service.updateIPConfigState(uuid, cns.PendingRelease); err != nil {
+        	if err := service.updateIPConfigState(uuid, cns.PendingRelease); err != nil {
                 return nil, err
             }
 
             pendingReleasedIps[uuid] = ipcConfig
-			count++
-			
-			if count == totalIpsToRelease {
+			if len(pendingReleasedIps) == totalIpsToRelease {
 				return pendingReleasedIps, nil
-			}	
-    	} 
+			}
+    	}
 	}
 	
 	// if not all expected IPs are set to PendingRelease, then check the Available IPs 
@@ -123,21 +120,20 @@ func (service *HTTPRestService) MarkIPAsPendingRelease(totalIpsToRelease int) (m
             }
 
             pendingReleasedIps[uuid] = ipcConfig
-			count++
 			
-			if count == totalIpsToRelease {
+			if len(pendingReleasedIps) == totalIpsToRelease {
 				return pendingReleasedIps, nil
 			}	
     	} 
 	}
 
-	logger.Printf("[MarkIPAsPendingRelease] Set total ips to PendingRelease %d, expected %d", count, totalIpsToRelease)
+	logger.Printf("[MarkIPAsPendingRelease] Set total ips to PendingRelease %d, expected %d", len(pendingReleasedIps), totalIpsToRelease)
 	return pendingReleasedIps, nil
 }
 
 func (service *HTTPRestService) updateIPConfigState(ipId string, updatedState string) error {
 	if ipConfig, found := service.PodIPConfigState[ipId]; found {
-		logger.Printf("[updateIPConfigState] Changing existingIpConfig [%v] state [%s] to [%s]", ipConfig, ipConfig.State, updatedState)
+		logger.Printf("[updateIPConfigState] Changing IpId [%s] state to [%s]. Current config [%+v]", ipId, updatedState, ipConfig.ToString())
 		ipConfig.State = updatedState
 		service.PodIPConfigState[ipId] = ipConfig
 		return nil
@@ -160,12 +156,15 @@ func (service *HTTPRestService) MarkIpsAsAvailableUntransacted(ncID string, newH
 				if ipConfigStatus, exist := service.PodIPConfigState[uuid]; !exist {
 					logger.Errorf("IP %s with uuid as %s exist in service state Secondary IP list but can't find in PodIPConfigState", ipConfigStatus.IPAddress, uuid)
 				} else if ipConfigStatus.State == cns.PendingProgramming && secondaryIPConfigs.NCVersion <= newHostNCVersion {
-					ipConfigStatus.State = cns.Available
-					service.PodIPConfigState[uuid] = ipConfigStatus
+					err := service.updateIPConfigState(uuid, cns.Available)
+					if err != nil {
+						logger.Errorf("Error updating IPConfig [%+v] state to Available, err: %+v", ipConfigStatus.ToString(), err)
+					}
+
 					// Following 2 sentence assign new host version to secondary ip config.
 					secondaryIPConfigs.NCVersion = newHostNCVersion
 					ncInfo.CreateNetworkContainerRequest.SecondaryIPConfigs[uuid] = secondaryIPConfigs
-					logger.Printf("Change ip %s with uuid %s from pending programming to %s, current secondary ip configs is %v", ipConfigStatus.IPAddress, uuid, cns.Available,
+					logger.Printf("Change ip %s with uuid %s from pending programming to %s, current secondary ip configs is %+v", ipConfigStatus.IPAddress, uuid, cns.Available,
 						ncInfo.CreateNetworkContainerRequest.SecondaryIPConfigs[uuid])
 				}
 			}
@@ -291,23 +290,27 @@ func filterIPConfigMap(toBeAdded map[string]cns.IPConfigurationStatus, f func(cn
 }
 
 //SetIPConfigAsAllocated takes a lock of the service, and sets the ipconfig in the CNS state as allocated, does not take a lock
-func (service *HTTPRestService) setIPConfigAsAllocated(ipconfig cns.IPConfigurationStatus, podInfo cns.KubernetesPodInfo, marshalledOrchestratorContext json.RawMessage) cns.IPConfigurationStatus {
-	logger.Printf("[setIPConfigAsAllocated] Marking IP [%v] to Allocated for Pod [%v]", ipconfig, podInfo)
-	ipconfig.State = cns.Allocated
-	ipconfig.OrchestratorContext = marshalledOrchestratorContext
+func (service *HTTPRestService) setIPConfigAsAllocated(ipconfig cns.IPConfigurationStatus, podInfo cns.KubernetesPodInfo, marshalledOrchestratorContext json.RawMessage) (cns.IPConfigurationStatus, error) {
+	err := service.updateIPConfigState(ipconfig.ID, cns.Allocated)
+	if err != nil {
+		return cns.IPConfigurationStatus{}, err
+	}
+
 	service.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()] = ipconfig.ID
 	service.PodIPConfigState[ipconfig.ID] = ipconfig
-	return service.PodIPConfigState[ipconfig.ID]
+	return service.PodIPConfigState[ipconfig.ID], nil
 }
 
 //SetIPConfigAsAllocated and sets the ipconfig in the CNS state as allocated, does not take a lock
-func (service *HTTPRestService) setIPConfigAsAvailable(ipconfig cns.IPConfigurationStatus, podInfo cns.KubernetesPodInfo) cns.IPConfigurationStatus {
-	logger.Printf("[setIPConfigAsAllocated] Marking IP [%v] to Available, Released from Pod [%v]", ipconfig, podInfo)
-	ipconfig.State = cns.Available
-	ipconfig.OrchestratorContext = nil
+func (service *HTTPRestService) setIPConfigAsAvailable(ipconfig cns.IPConfigurationStatus, podInfo cns.KubernetesPodInfo) (cns.IPConfigurationStatus, error) {
+	err := service.updateIPConfigState(ipconfig.ID, cns.Available)
+	if err != nil {
+		return cns.IPConfigurationStatus{}, err
+	}
+
 	service.PodIPConfigState[ipconfig.ID] = ipconfig
 	delete(service.PodIPIDByOrchestratorContext, podInfo.GetOrchestratorContextKey())
-	return service.PodIPConfigState[ipconfig.ID]
+	return service.PodIPConfigState[ipconfig.ID], nil
 }
 
 ////SetIPConfigAsAllocated takes a lock of the service, and sets the ipconfig in the CNS stateas Available
@@ -320,15 +323,18 @@ func (service *HTTPRestService) releaseIPConfig(podInfo cns.KubernetesPodInfo) e
 	ipID := service.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()]
 	if ipID != "" {
 		if ipconfig, isExist := service.PodIPConfigState[ipID]; isExist {
-			service.setIPConfigAsAvailable(ipconfig, podInfo)
-			logger.Printf("Released IP %+v for pod %+v", ipconfig.IPAddress, podInfo)
+			_, err := service.setIPConfigAsAvailable(ipconfig, podInfo)
+			if err != nil {
+				return fmt.Errorf("[releaseIPConfig] failed to mark IPConfig [%+v] as Available.", ipconfig.ToString(), err)
+			}
+			logger.Printf("[releaseIPConfig] Released IP %+v for pod %+v", ipconfig.IPAddress, podInfo)
 
 		} else {
-			logger.Errorf("Failed to get release ipconfig. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
-			return fmt.Errorf("releaseIPConfig failed. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
+			logger.Errorf("[releaseIPConfig] Failed to get release ipconfig. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
+			return fmt.Errorf("[releaseIPConfig] releaseIPConfig failed. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
 		}
 	} else {
-		logger.Errorf("SetIPConfigAsAvailable failed to release, no allocation found for pod")
+		logger.Errorf("[releaseIPConfig] SetIPConfigAsAvailable failed to release, no allocation found for pod")
 		return nil
 	}
 	return nil
@@ -345,7 +351,7 @@ func (service *HTTPRestService) MarkExistingIPsAsPending(pendingIPIDs []string) 
 				return fmt.Errorf("Failed to mark IP [%v] as pending, currently allocated", id)
 			}
 
-            logger.Printf("[MarkExistingIPsAsPending]: Marking IP [%v] to PendingRelease", ipconfig)
+            logger.Printf("[MarkExistingIPsAsPending]: Marking IP [%+v] to PendingRelease", ipconfig.ToString())
 			ipconfig.State = cns.PendingRelease
 			service.PodIPConfigState[id] = ipconfig
 		} else {
@@ -384,31 +390,35 @@ func (service *HTTPRestService) AllocateDesiredIPConfig(podInfo cns.KubernetesPo
 	defer service.Unlock()
 
 	found := false
-	for _, ipState := range service.PodIPConfigState {
-		if ipState.IPAddress == desiredIPAddress {
-			if ipState.State == cns.Allocated {
+	for _, ipConfig := range service.PodIPConfigState {
+		if ipConfig.IPAddress == desiredIPAddress {
+			if ipConfig.State == cns.Allocated {
 				// This IP has already been allocated, if it is allocated to same pod, then return the same
 				// IPconfiguration
-				if bytes.Equal(orchestratorContext, ipState.OrchestratorContext) == true {
-					logger.Printf("[AllocateDesiredIPConfig]: IP [%v] is already allocated to this Pod [%v]", ipState, podInfo)
+				if bytes.Equal(orchestratorContext, ipConfig.OrchestratorContext) == true {
+					logger.Printf("[AllocateDesiredIPConfig]: IP Config [%+v] is already allocated to this Pod [%+v]", ipConfig, podInfo)
 					found = true
 				} else {
 					var pInfo cns.KubernetesPodInfo
-					err := json.Unmarshal(ipState.OrchestratorContext, &pInfo)
+					err := json.Unmarshal(ipConfig.OrchestratorContext, &pInfo)
 					if err != nil {
-						return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Failed to unmarshal IPState [%v] OrchestratorContext, err: %v", ipState, err)
+						return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Failed to unmarshal IPState [%+v] OrchestratorContext, err: %v", ipConfig.ToString(), err)
 					}
-					return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Desired IP is already allocated %+v to Pod: %+v, requested for pod %+v", ipState, pInfo, podInfo)
+					return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Desired IP is already allocated %+v to Pod: %+v, requested for pod %+v", ipConfig.ToString(), pInfo, podInfo)
 				}
-			} else if ipState.State == cns.Available {
-				service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
+			} else if ipConfig.State == cns.Available {
+				_, err := service.setIPConfigAsAllocated(ipConfig, podInfo, orchestratorContext)
+				if err != nil {
+					return podIpInfo, err
+				}
+
 				found = true
 			} else {
-				return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Desired IP is not available %+v", ipState)
+				return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Desired IP is not available %+v", ipConfig.ToString())
 			}
 
 			if found {
-				err := service.populateIpConfigInfoUntransacted(ipState, &podIpInfo)
+				err := service.populateIpConfigInfoUntransacted(ipConfig, &podIpInfo)
 				return podIpInfo, err
 			}
 		}
@@ -424,10 +434,16 @@ func (service *HTTPRestService) AllocateAnyAvailableIPConfig(podInfo cns.Kuberne
 
 	for _, ipState := range service.PodIPConfigState {
 		if ipState.State == cns.Available {
-			err := service.populateIpConfigInfoUntransacted(ipState, &podIpInfo)
-			if err == nil {
-				service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
+			_, err := service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
+			if err != nil {
+				return podIpInfo, err
 			}
+
+			err = service.populateIpConfigInfoUntransacted(ipState, &podIpInfo)
+			if err != nil {
+				return podIpInfo, err
+			}
+
 			return podIpInfo, err
 		}
 	}
