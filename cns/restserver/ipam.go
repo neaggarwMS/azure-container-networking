@@ -325,7 +325,7 @@ func (service *HTTPRestService) releaseIPConfig(podInfo cns.KubernetesPodInfo) e
 		if ipconfig, isExist := service.PodIPConfigState[ipID]; isExist {
 			_, err := service.setIPConfigAsAvailable(ipconfig, podInfo)
 			if err != nil {
-				return fmt.Errorf("[releaseIPConfig] failed to mark IPConfig [%+v] as Available.", ipconfig, err)
+				return fmt.Errorf("[releaseIPConfig] failed to mark IPConfig [%+v] as Available. err: %v", ipconfig, err)
 			}
 			logger.Printf("[releaseIPConfig] Released IP %+v for pod %+v", ipconfig.IPAddress, podInfo)
 

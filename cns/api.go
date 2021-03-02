@@ -58,7 +58,7 @@ type IPConfigurationStatus struct {
 }
 
 func (i IPConfigurationStatus) String() string {
-	return fmt.Sprintf("IPConfigurationStatus: Id %s, NcId %s, IpAddress %s, State %s, OrchestratorContext %s",
+	return fmt.Sprintf("IPConfigurationStatus: Id: [%s], NcId: [%s], IpAddress: [%s], State: [%s], OrchestratorContext: [%s]",
 		i.ID, i.NCID, i.IPAddress, i.State, string(i.OrchestratorContext))
 }
 
