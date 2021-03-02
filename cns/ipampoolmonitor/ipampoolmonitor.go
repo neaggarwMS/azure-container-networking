@@ -103,8 +103,8 @@ func (pm *CNSIPAMPoolMonitor) Reconcile() error {
 }
 
 func (pm *CNSIPAMPoolMonitor) increasePoolSize() error {
-	pm.mu.Lock()
 	defer pm.mu.Unlock()
+	pm.mu.Lock()
 
 	var err error
 	var tempNNCSpec nnc.NodeNetworkConfigSpec
@@ -122,14 +122,15 @@ func (pm *CNSIPAMPoolMonitor) increasePoolSize() error {
 		return err
 	}
 
+	logger.Printf("[ipam-pool-monitor] Increasing pool size: UpdateCRDSpec succeeded for spec %+v", tempNNCSpec)
 	// save the updated state to cachedSpec
 	pm.cachedNNC.Spec = tempNNCSpec
 	return nil
 }
 
 func (pm *CNSIPAMPoolMonitor) decreasePoolSize(existingPendingReleaseIPCount int) error {
-	pm.mu.Lock()
 	defer pm.mu.Unlock()
+	pm.mu.Lock()
 
 	// mark n number of IP's as pending
 	var err error
@@ -166,6 +167,8 @@ func (pm *CNSIPAMPoolMonitor) decreasePoolSize(existingPendingReleaseIPCount int
 		return err
 	}
 
+	logger.Printf("[ipam-pool-monitor] Decreasing pool size: UpdateCRDSpec succeeded for spec %+v", tempNNCSpec)
+
 	// save the updated state to cachedSpec
 	pm.cachedNNC.Spec = tempNNCSpec
 	pm.pendingRelease = true
@@ -181,8 +184,8 @@ func (pm *CNSIPAMPoolMonitor) decreasePoolSize(existingPendingReleaseIPCount int
 // if cns pending ip release map is empty, request controller has already reconciled the CNS state,
 // so we can remove it from our cache and remove the IP's from the CRD
 func (pm *CNSIPAMPoolMonitor) cleanPendingRelease() error {
-	pm.mu.Lock()
 	defer pm.mu.Unlock()
+	pm.mu.Lock()
 
 	var err error
 	var tempNNCSpec nnc.NodeNetworkConfigSpec
@@ -196,6 +199,9 @@ func (pm *CNSIPAMPoolMonitor) cleanPendingRelease() error {
 		// caller will retry to update the CRD again
 		return err
 	}
+
+	logger.Printf("[ipam-pool-monitor] cleanPendingRelease: UpdateCRDSpec succeeded for spec %+v", tempNNCSpec)
+
 
 	// save the updated state to cachedSpec
 	pm.cachedNNC.Spec = tempNNCSpec
@@ -228,14 +234,18 @@ func (pm *CNSIPAMPoolMonitor) createNNCSpecForCRD(resetNotInUseList bool) (nnc.N
 
 // UpdatePoolLimitsTransacted called by request controller on reconcile to set the batch size limits
 func (pm *CNSIPAMPoolMonitor) Update(scalar nnc.Scaler, spec nnc.NodeNetworkConfigSpec) error {
-	pm.mu.Lock()
 	defer pm.mu.Unlock()
+	pm.mu.Lock()
+
 	pm.scalarUnits = scalar
 
 	pm.MinimumFreeIps = int64(float64(pm.scalarUnits.BatchSize) * (float64(pm.scalarUnits.RequestThresholdPercent) / 100))
 	pm.MaximumFreeIps = int64(float64(pm.scalarUnits.BatchSize) * (float64(pm.scalarUnits.ReleaseThresholdPercent) / 100))
 
 	pm.cachedNNC.Spec = spec
+
+	logger.Printf("[ipam-pool-monitor] Update spec %+v, pm.MinimumFreeIps %d, pm.MaximumFreeIps %d",
+		pm.cachedNNC.Spec, pm.MinimumFreeIps, pm.MaximumFreeIps)
 
 	return nil
 }

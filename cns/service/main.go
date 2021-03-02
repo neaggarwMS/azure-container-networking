@@ -715,6 +715,7 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 				// retry to start the request controller
 				// todo: add a CNS metric to count # of failures
 			} else {
+				logger.Printf("[Azure CNS] Exiting RequestController")
 				return
 			}
 
@@ -739,6 +740,8 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 		if err := httpRestServiceImplementation.IPAMPoolMonitor.Start(ctx, poolIPAMRefreshRateInMilliseconds); err != nil {
 			logger.Errorf("[Azure CNS] Failed to start pool monitor with err: %v", err)
 		}
+
+		logger.Printf("[Azure CNS] Exiting IPAM Pool Monitor")
 	}()
 
 	logger.Printf("Starting SyncHostNCVersion")
@@ -749,5 +752,7 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 			<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
 			httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
 		}
+
+		logger.Printf("[Azure CNS] Exiting SyncHostNCVersion")
 	}()
 }
