@@ -4,6 +4,8 @@
 package cns
 
 import (
+	"fmt"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"net/http"
 	"net/url"
 	"strings"
@@ -80,11 +82,18 @@ func (service *Service) Initialize(config *common.ServiceConfig) error {
 				return err
 			}
 		}
-		// Start the listener.
-		// continue to listen on the normal endpoint for http traffic, this will be supported
-		// for sometime until partners migrate fully to https
-		if err = listener.Start(config.ErrChan); err != nil {
-			return err
+
+		// todo: Do we need to run this logic for all channel types
+		if config.ChannelMode == CRD {
+			logger.Printf("HTTP listener will be started later after CNS state has been reconciled")
+		} else {
+			logger.Printf("Starting HTTP listener")
+			// Start the listener.
+			// continue to listen on the normal endpoint for http traffic, this will be supported
+			// for sometime until partners migrate fully to https
+			if err = listener.Start(config.ErrChan); err != nil {
+				return err
+			}
 		}
 		config.Listener = listener
 	}
@@ -92,6 +101,25 @@ func (service *Service) Initialize(config *common.ServiceConfig) error {
 	service.Listener = config.Listener
 
 	log.Debugf("[Azure CNS] Successfully initialized a service with config: %+v", config)
+	return nil
+}
+
+func (service *Service) StartListener(config *common.ServiceConfig) error {
+	log.Debugf("[Azure CNS] Going to start listener: %+v", config)
+
+	// Initialize the listener.
+	if service.Listener != nil {
+		log.Debugf("[Azure CNS] Starting listener: %+v", config)
+		// Start the listener.
+		// continue to listen on the normal endpoint for http traffic, this will be supported
+		// for sometime until partners migrate fully to https
+		if err := service.Listener.Start(config.ErrChan); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("Failed to start a listener, it is not initialized, config %+v", config)
+	}
+
 	return nil
 }
 
