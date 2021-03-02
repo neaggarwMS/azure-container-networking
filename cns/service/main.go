@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/ipampoolmonitor"
 	"github.com/Azure/azure-container-networking/cns/requestcontroller"
 	"github.com/Azure/azure-container-networking/cns/requestcontroller/kubecontroller"
+	localtls "github.com/Azure/azure-container-networking/server/tls"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,10 +20,9 @@ import (
 	"syscall"
 	"time"
 
-	localtls "github.com/Azure/azure-container-networking/server/tls"
-
 	"github.com/Azure/azure-container-networking/cns/nmagentclient"
 
+	"context"
 	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/cnm/ipam"
 	"github.com/Azure/azure-container-networking/cnm/network"
@@ -38,7 +38,6 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
-	"context"
 )
 
 const (
@@ -483,15 +482,7 @@ func main() {
 		}
 	}
 
-
-	// Initialze state in if CNS is running in CRD mode
-	// State must be initialized before we start HTTPRestService
-	if config.ChannelMode == cns.CRD {
-		IniitalizeCRDState(httpRestService, cnsconfig)
-	}
-
-	logger.Printf("[Azure CNS] Starting HTTPRestService")
-	// Start CNS.
+	logger.Printf("[Azure CNS] Initialize HTTPRestService")
 	if httpRestService != nil {
 		if cnsconfig.UseHTTPS {
 			config.TlsSettings = localtls.TlsSettings{
@@ -501,6 +492,21 @@ func main() {
 			}
 		}
 
+		err = httpRestService.Init(&config)
+		if err != nil {
+			logger.Errorf("Failed to init HTTPService, err:%v.\n", err)
+			return
+		}
+	}
+
+	// Initialze state in if CNS is running in CRD mode
+	// State must be initialized before we start HTTPRestService
+	if config.ChannelMode == cns.CRD {
+		IniitalizeCRDState(httpRestService, cnsconfig)
+	}
+
+	logger.Printf("[Azure CNS] Start HTTP listener")
+	if (httpRestService != nil) {
 		err = httpRestService.Start(&config)
 		if err != nil {
 			logger.Errorf("Failed to start CNS, err:%v.\n", err)

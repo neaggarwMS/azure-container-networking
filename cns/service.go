@@ -83,18 +83,7 @@ func (service *Service) Initialize(config *common.ServiceConfig) error {
 			}
 		}
 
-		// todo: Do we need to run this logic for all channel types
-		if config.ChannelMode == CRD {
-			logger.Printf("HTTP listener will be started later after CNS state has been reconciled")
-		} else {
-			logger.Printf("Starting HTTP listener")
-			// Start the listener.
-			// continue to listen on the normal endpoint for http traffic, this will be supported
-			// for sometime until partners migrate fully to https
-			if err = listener.Start(config.ErrChan); err != nil {
-				return err
-			}
-		}
+		logger.Printf("HTTP listener will be started later after CNS state has been reconciled")
 		config.Listener = listener
 	}
 
