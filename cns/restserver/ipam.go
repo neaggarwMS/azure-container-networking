@@ -99,13 +99,14 @@ func (service *HTTPRestService) MarkIPAsPendingRelease(totalIpsToRelease int) (m
 	service.Lock()
 	defer service.Unlock()
 
-	for uuid, ipcConfig := range service.PodIPConfigState {
-        if ipcConfig.State == cns.PendingProgramming {
-        	if err := service.updateIPConfigState(uuid, cns.PendingRelease); err != nil {
+	for uuid, existingIpConfig := range service.PodIPConfigState {
+        if existingIpConfig.State == cns.PendingProgramming {
+        	updatedIpConfig, err := service.updateIPConfigState(uuid, cns.PendingRelease, existingIpConfig.OrchestratorContext)
+        	if err != nil {
                 return nil, err
             }
 
-            pendingReleasedIps[uuid] = ipcConfig
+            pendingReleasedIps[uuid] = updatedIpConfig
 			if len(pendingReleasedIps) == totalIpsToRelease {
 				return pendingReleasedIps, nil
 			}
@@ -113,13 +114,14 @@ func (service *HTTPRestService) MarkIPAsPendingRelease(totalIpsToRelease int) (m
 	}
 	
 	// if not all expected IPs are set to PendingRelease, then check the Available IPs 
-	for uuid, ipcConfig := range service.PodIPConfigState {
-        if ipcConfig.State == cns.Available {
-            if err := service.updateIPConfigState(uuid, cns.PendingRelease); err != nil {
+	for uuid, existingIpConfig := range service.PodIPConfigState {
+        if existingIpConfig.State == cns.Available {
+            updatedIpConfig, err := service.updateIPConfigState(uuid, cns.PendingRelease, existingIpConfig.OrchestratorContext)
+            if err != nil {
                 return nil, err
             }
 
-            pendingReleasedIps[uuid] = ipcConfig
+            pendingReleasedIps[uuid] = updatedIpConfig
 			
 			if len(pendingReleasedIps) == totalIpsToRelease {
 				return pendingReleasedIps, nil
@@ -131,15 +133,16 @@ func (service *HTTPRestService) MarkIPAsPendingRelease(totalIpsToRelease int) (m
 	return pendingReleasedIps, nil
 }
 
-func (service *HTTPRestService) updateIPConfigState(ipId string, updatedState string) error {
+func (service *HTTPRestService) updateIPConfigState(ipId string, updatedState string, orchestratorContext json.RawMessage) (cns.IPConfigurationStatus, error) {
 	if ipConfig, found := service.PodIPConfigState[ipId]; found {
-		logger.Printf("[updateIPConfigState] Changing IpId [%s] state to [%s]. Current config [%+v]", ipId, updatedState, ipConfig)
+		logger.Printf("[updateIPConfigState] Changing IpId [%s] state to [%s], orchestratorContext [%s]. Current config [%+v]", ipId, updatedState, string(orchestratorContext), ipConfig)
 		ipConfig.State = updatedState
+		ipConfig.OrchestratorContext = orchestratorContext
 		service.PodIPConfigState[ipId] = ipConfig
-		return nil
+		return ipConfig, nil
 	} 
 	
-	return fmt.Errorf("[updateIPConfigState] Failed to update state %s for the IPConfig. ID %s not found PodIPConfigState", updatedState, ipId)
+	return  cns.IPConfigurationStatus{}, fmt.Errorf("[updateIPConfigState] Failed to update state %s for the IPConfig. ID %s not found PodIPConfigState", updatedState, ipId)
 }
 
 // MarkIpsAsAvailableUntransacted will update pending programming IPs to available if NMAgent side's programmed nc version keep up with nc version.
@@ -156,7 +159,7 @@ func (service *HTTPRestService) MarkIpsAsAvailableUntransacted(ncID string, newH
 				if ipConfigStatus, exist := service.PodIPConfigState[uuid]; !exist {
 					logger.Errorf("IP %s with uuid as %s exist in service state Secondary IP list but can't find in PodIPConfigState", ipConfigStatus.IPAddress, uuid)
 				} else if ipConfigStatus.State == cns.PendingProgramming && secondaryIPConfigs.NCVersion <= newHostNCVersion {
-					err := service.updateIPConfigState(uuid, cns.Available)
+					_, err := service.updateIPConfigState(uuid, cns.Available, nil)
 					if err != nil {
 						logger.Errorf("Error updating IPConfig [%+v] state to Available, err: %+v", ipConfigStatus, err)
 					}
@@ -291,26 +294,24 @@ func filterIPConfigMap(toBeAdded map[string]cns.IPConfigurationStatus, f func(cn
 
 //SetIPConfigAsAllocated takes a lock of the service, and sets the ipconfig in the CNS state as allocated, does not take a lock
 func (service *HTTPRestService) setIPConfigAsAllocated(ipconfig cns.IPConfigurationStatus, podInfo cns.KubernetesPodInfo, marshalledOrchestratorContext json.RawMessage) (cns.IPConfigurationStatus, error) {
-	err := service.updateIPConfigState(ipconfig.ID, cns.Allocated)
+	ipconfig, err := service.updateIPConfigState(ipconfig.ID, cns.Allocated, marshalledOrchestratorContext)
 	if err != nil {
 		return cns.IPConfigurationStatus{}, err
 	}
 
 	service.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()] = ipconfig.ID
-	service.PodIPConfigState[ipconfig.ID] = ipconfig
-	return service.PodIPConfigState[ipconfig.ID], nil
+	return ipconfig, nil
 }
 
 //SetIPConfigAsAllocated and sets the ipconfig in the CNS state as allocated, does not take a lock
 func (service *HTTPRestService) setIPConfigAsAvailable(ipconfig cns.IPConfigurationStatus, podInfo cns.KubernetesPodInfo) (cns.IPConfigurationStatus, error) {
-	err := service.updateIPConfigState(ipconfig.ID, cns.Available)
+	ipconfig, err := service.updateIPConfigState(ipconfig.ID, cns.Available, nil)
 	if err != nil {
 		return cns.IPConfigurationStatus{}, err
 	}
 
-	service.PodIPConfigState[ipconfig.ID] = ipconfig
 	delete(service.PodIPIDByOrchestratorContext, podInfo.GetOrchestratorContextKey())
-	return service.PodIPConfigState[ipconfig.ID], nil
+	return ipconfig, nil
 }
 
 ////SetIPConfigAsAllocated takes a lock of the service, and sets the ipconfig in the CNS stateas Available
