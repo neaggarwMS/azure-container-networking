@@ -502,7 +502,9 @@ func main() {
 	// Initialze state in if CNS is running in CRD mode
 	// State must be initialized before we start HTTPRestService
 	if config.ChannelMode == cns.CRD {
-		IniitalizeCRDState(httpRestService, cnsconfig)
+		requestControllerStopChannel := make(chan struct{})
+		defer close(requestControllerStopChannel)
+		IniitalizeCRDState(httpRestService, cnsconfig, requestControllerStopChannel)
 	}
 
 	logger.Printf("[Azure CNS] Start HTTP listener")
@@ -665,7 +667,7 @@ func main() {
 }
 
 // initializeCRD state
-func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration.CNSConfig) {
+func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration.CNSConfig, exitChan <-chan struct{}) {
 	var requestController requestcontroller.RequestController
 
 	logger.Printf("[Azure CNS] Starting request controller")
@@ -706,11 +708,9 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	}
 
 	//Start the RequestController which starts the reconcile loop
-	requestControllerStopChannel := make(chan struct{})
-	defer close(requestControllerStopChannel)
 	go func() {
 		for {
-			if err := requestController.StartRequestController(requestControllerStopChannel); err != nil {
+			if err := requestController.StartRequestController(exitChan); err != nil {
 				logger.Errorf("[Azure CNS] Failed to start request controller: %v", err)
 				// retry to start the request controller
 				// todo: add a CNS metric to count # of failures
