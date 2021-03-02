@@ -16,7 +16,7 @@ type CNSIPAMPoolMonitor struct {
 	pendingRelease bool
 
 	cachedNNC   nnc.NodeNetworkConfig
-	updatingPendingIpsNotInUse map[string]cns.IPConfigurationStatus
+	updatingIpsNotInUseCount int
 	scalarUnits nnc.Scaler
 
 	httpService    cns.HTTPService
@@ -33,7 +33,6 @@ func NewCNSIPAMPoolMonitor(httpService cns.HTTPService, rc requestcontroller.Req
 		pendingRelease:				false,
 		httpService:        		httpService,
 		rc:             			rc,
-		updatingPendingIpsNotInUse: make(map[string]cns.IPConfigurationStatus),
 	}
 }
 
@@ -134,29 +133,31 @@ func (pm *CNSIPAMPoolMonitor) decreasePoolSize(existingPendingReleaseIPCount int
 
 	// mark n number of IP's as pending
 	var err error
+	var newIpsMarkedAsPending bool
 	var pendingIpAddresses map[string]cns.IPConfigurationStatus
-	updatingPendingReleaseIpsCount := len(pm.updatingPendingIpsNotInUse)
-	if updatingPendingReleaseIpsCount == 0 ||
-		updatingPendingReleaseIpsCount <= existingPendingReleaseIPCount {
+	if pm.updatingIpsNotInUseCount == 0 ||
+		pm.updatingIpsNotInUseCount < existingPendingReleaseIPCount {
 		logger.Printf("[ipam-pool-monitor] Marking IPs as PendingRelease, ipsToBeReleasedCount %d", int(pm.scalarUnits.BatchSize))
 		pendingIpAddresses, err = pm.httpService.MarkIPAsPendingRelease(int(pm.scalarUnits.BatchSize))
 		if err != nil {
 			return err
 		}
 
-		// cache the updatingPendingRelease so that we dont re-set new IPs to PendingRelease in case UpdateCRD call fails
-		for _, ipConfig := range pendingIpAddresses {
-			pm.updatingPendingIpsNotInUse[ipConfig.ID] = ipConfig
-		}
+		newIpsMarkedAsPending = true
 	}
-
-	logger.Printf("[ipam-pool-monitor] Releasing IPCount in this batch %d, updatingPendingIpsNotInUse count %d", len(pendingIpAddresses), len(pm.updatingPendingIpsNotInUse))
 
 	var tempNNCSpec nnc.NodeNetworkConfigSpec
 	tempNNCSpec, err = pm.createNNCSpecForCRD(false)
 	if err != nil {
 		return err
 	}
+
+	if newIpsMarkedAsPending {
+		// cache the updatingPendingRelease so that we dont re-set new IPs to PendingRelease in case UpdateCRD call fails
+		pm.updatingIpsNotInUseCount = len(tempNNCSpec.IPsNotInUse)
+	}
+
+	logger.Printf("[ipam-pool-monitor] Releasing IPCount in this batch %d, updatingPendingIpsNotInUse count %d", len(pendingIpAddresses), pm.updatingIpsNotInUseCount)
 
 	tempNNCSpec.RequestedIPCount -= int64(len(pendingIpAddresses))
 	logger.Printf("[ipam-pool-monitor] Decreasing pool size, Current Pool Size: %v, Requested IP Count: %v, Pods with IP's: %v, ToBeDeleted Count: %v", len(pm.httpService.GetPodIPConfigState()), tempNNCSpec.RequestedIPCount, len(pm.httpService.GetAllocatedIPConfigs()), len(tempNNCSpec.IPsNotInUse))
@@ -174,10 +175,9 @@ func (pm *CNSIPAMPoolMonitor) decreasePoolSize(existingPendingReleaseIPCount int
 	pm.pendingRelease = true
 
 	// clear the updatingPendingIpsNotInUse, as we have Updated the CRD
-	logger.Printf("[ipam-pool-monitor] cleaning the updatingPendingIpsNotInUse, existing length %d", len(pm.updatingPendingIpsNotInUse))
-	for key, _ := range pm.updatingPendingIpsNotInUse {
-		delete(pm.updatingPendingIpsNotInUse, key)
-	}
+	logger.Printf("[ipam-pool-monitor] cleaning the updatingPendingIpsNotInUse, existing length %d", pm.updatingIpsNotInUseCount)
+	pm.updatingIpsNotInUseCount = 0
+
 	return nil
 }
 
