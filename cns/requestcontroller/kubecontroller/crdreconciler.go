@@ -50,7 +50,7 @@ func (r *CrdReconciler) Reconcile(request reconcile.Request) (reconcile.Result, 
 	}
 
 	networkContainer := nodeNetConfig.Status.NetworkContainers[0]
-	logger.Printf("[cns-rc] CRD Status: NcId: [%s], Version: [%s],  podSubnet: [%s], Subnet CIDR: [%s], " +
+	logger.Printf("[cns-rc] CRD Status: NcId: [%s], Version: [%d],  podSubnet: [%s], Subnet CIDR: [%s], " +
 		"Gateway Addr: [%s], Primary IP: [%s], SecondaryIpsCount: [%d]",
 		networkContainer.ID,
 		networkContainer.Version,
