@@ -686,7 +686,8 @@ func IniitalizeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	httpRestServiceImplementation, ok := httpRestService.(*restserver.HTTPRestService)
 	if !ok {
 		logger.Errorf("[Azure CNS] Failed to convert interface httpRestService to implementation: %v", httpRestService)
-		return err
+		return  fmt.Errorf("[Azure CNS] Failed to convert interface httpRestService to implementation: %v",
+			httpRestService)
 	}
 
 	// Set orchestrator type
