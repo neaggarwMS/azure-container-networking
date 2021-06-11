@@ -743,9 +743,12 @@ func InitializeMultiTenantController(httpRestService cns.HTTPService, cnsconfig 
 	rootCxt := context.Background()
 	go func() {
 		// Periodically poll vfp programmed NC version from NMAgent
+		timerChannel := time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
 		for {
-			<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
-			httpRestServiceImpl.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			select {
+			case <-timerChannel:
+				httpRestServiceImpl.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			}
 		}
 	}()
 
@@ -842,9 +845,12 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	rootCxt := context.Background()
 	go func() {
 		// Periodically poll vfp programmed NC version from NMAgent
+		timerChannel := time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
 		for {
-			<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
-			httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			select {
+			case <-timerChannel:
+				httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			}
 		}
 
 		logger.Printf("[Azure CNS] Exiting SyncHostNCVersion")
