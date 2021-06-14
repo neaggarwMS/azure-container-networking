@@ -845,11 +845,13 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	rootCxt := context.Background()
 	go func() {
 		// Periodically poll vfp programmed NC version from NMAgent
-		timerChannel := time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
+		ticker := time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond)
 		for {
 			select {
-			case <-timerChannel:
+			case <-ticker.C:
 				httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+            case <-rootCxt.Done():
+                return
 			}
 		}
 
